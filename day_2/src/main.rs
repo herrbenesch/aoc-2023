@@ -1,9 +1,9 @@
 use ferris_says::say;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{stdout, BufWriter};
 
 /*
---- Day 2: Cube Conundrum ---
+--- Day 2 - part 1: Cube Conundrum ---
 You're launched high into the atmosphere! The apex of your trajectory just barely reaches the surface of a large island floating in the sky. You gently land in a fluffy pile of leaves. It's quite cold, but you don't see much snow. An Elf runs over to greet you.
 
 The Elf explains that you've arrived at Snow Island and apologizes for the lack of snow. He'll be happy to explain the situation, but it's a bit of a walk, so you have some time. They don't get many visitors up here; would you like to play a game in the meantime?
@@ -28,6 +28,31 @@ The Elf would first like to know which games would have been possible if the bag
 In the example above, games 1, 2, and 5 would have been possible if the bag had been loaded with that configuration. However, game 3 would have been impossible because at one point the Elf showed you 20 red cubes at once; similarly, game 4 would also have been impossible because the Elf showed you 15 blue cubes at once. If you add up the IDs of the games that would have been possible, you get 8.
 
 Determine which games would have been possible if the bag had been loaded with only 12 red cubes, 13 green cubes, and 14 blue cubes. What is the sum of the IDs of those games?
+
+part 2: Cube Conundrum
+
+--- Part Two ---
+The Elf says they've stopped producing snow because they aren't getting any water! He isn't sure why the water stopped; however, he can show you how to get to the water source
+to check it out for yourself. It's just up ahead!
+
+As you continue your walk, the Elf poses a second question: in each game you played, what is the fewest number of cubes of each color that could have been in the bag
+to make the game possible?
+
+Again consider the example games from earlier:
+
+Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green
+In game 1, the game could have been played with as few as 4 red, 2 green, and 6 blue cubes. If any color had even one fewer cube, the game would have been impossible.
+Game 2 could have been played with a minimum of 1 red, 3 green, and 4 blue cubes.
+Game 3 must have been played with at least 20 red, 13 green, and 6 blue cubes.
+Game 4 required at least 14 red, 3 green, and 15 blue cubes.
+Game 5 needed no fewer than 6 red, 3 green, and 2 blue cubes in the bag.
+The power of a set of cubes is equal to the numbers of red, green, and blue cubes multiplied together. The power of the minimum set of cubes in game 1 is 48. In games 2-5 it was 12, 1560, 630, and 36, respectively. Adding up these five powers produces the sum 2286.
+
+For each game, find the minimum set of cubes that must have been present. What is the sum of the power of these sets?
 */
 
 static INPUT: &str= "Game 1: 2 blue, 3 red; 3 green, 3 blue, 6 red; 4 blue, 6 red; 2 green, 2 blue, 9 red; 2 red, 4 blue
@@ -131,66 +156,97 @@ Game 98: 2 blue, 3 green, 6 red; 1 green, 1 blue, 8 red; 8 red, 3 green, 1 blue;
 Game 99: 1 green, 2 red, 1 blue; 8 green, 4 blue, 1 red; 7 blue, 1 red, 11 green; 9 green, 3 blue; 1 red, 2 blue; 1 red, 6 blue
 Game 100: 7 blue, 9 green, 2 red; 5 red, 9 green; 1 blue, 8 red, 13 green";
 
-fn main() {
-    let stdout = stdout();
 
-    let input = INPUT;
-    let elements: Vec<&str> = input.lines().collect();
-    let games: HashMap<String, Vec<Vec<String>>> = elements
-        .iter()
-        .map(|&element| {
+fn prepare_games(input: &str) -> HashMap<String, Vec<Vec<String>>> {
+    input
+        .lines()
+        .map(|element| {
             let mut parts = element.splitn(2, ':').map(str::trim);
-            let game_id = parts.next().unwrap().split_whitespace().nth(1).unwrap().to_string();
-            let game_elements = parts.next().unwrap().split(';').map(str::trim);
-
-            (game_id, game_elements.map(|round| round.split(',').map(str::trim).map(String::from).collect()).collect())
+            let game_id = parts
+                .next()
+                .unwrap()
+                .split_whitespace()
+                .nth(1)
+                .unwrap()
+                .to_string();
+            let game_elements = parts
+                .next()
+                .unwrap()
+                .split(';')
+                .map(str::trim)
+                .map(|round| round.split(',').map(str::trim).map(String::from).collect())
+                .collect();
+            (game_id, game_elements)
         })
-        .collect();
+        .collect()
+}
 
-    let mut keys: Vec<String> = games.keys().cloned().collect();
-
-    for (game_id, game_elements) in games.iter() {
-        let bag: HashMap<&str, i32> = [("red", 12), ("green", 13), ("blue", 14)].iter().cloned().collect();
-
-        let red_bag = bag.get("red").unwrap();
-        let blue_bag = bag.get("blue").unwrap();
-        let green_bag = bag.get("green").unwrap();
-        for round_move in game_elements.iter().flatten() {
-            let parts: Vec<&str> = round_move.split_whitespace().collect();
-            let mut value: i32 = 0;
-            if let Ok(parsed_value) = parts[0].parse::<i32>() {
-                value = parsed_value;
-            } else {
-            }
+fn is_game_possible(game_elements: &Vec<Vec<String>>, bag: &HashMap<&str, i32>) -> bool {
+    for round_move in game_elements.iter().flatten() {
+        let parts: Vec<&str> = round_move.split_whitespace().collect();
+        if let Ok(value) = parts[0].parse::<i32>() {
             let color = parts[1];
-            if color == "red" {
-                // red += value;
-                if value > *red_bag {
-                    keys.retain(|x| x != game_id);
-                    println!("Game {} is not possible!", game_id);
-                    break;
-                }
-            } else if color == "blue" {
-                // blue += value;
-                if value > *blue_bag {
-                    keys.retain(|x| x != game_id);
-                    println!("Game {} is not possible!", game_id);
-                    break;
-                }
-            } else if color == "green" {
-                // green += value;
-                if value > *green_bag {
-                    keys.retain(|x| x != game_id);
-                    println!("Game {} is not possible!", game_id);
-                    break;
+            if let Some(color_bag) = bag.get(color) {
+                if value > *color_bag {
+                    return false;
                 }
             }
         }
     }
+    true
+}
 
-    // sum of keys
-    let sum: u32 = keys.iter().map(|x| x.parse::<u32>().unwrap()).sum();
-    let message = String::from("The solution is: ") + &sum.to_string() + &String::from("\n");
+fn calculate_product(game_elements: &Vec<Vec<String>>) -> i32 {
+    let mut max_values: HashMap<&str, i32> = [("red", 0), ("green", 0), ("blue", 0)]
+        .iter()
+        .cloned()
+        .collect();
+
+    for round_move in game_elements.iter().flatten() {
+        let parts: Vec<&str> = round_move.split_whitespace().collect();
+        if let Ok(value) = parts[0].parse::<i32>() {
+            let color = parts[1];
+            if value > *max_values.get(color).unwrap() {
+                max_values.insert(color, value);
+            }
+        }
+    }
+
+    max_values.values().product()
+}
+
+fn part_1(input: &str) -> u32 {
+    let games = prepare_games(input);
+    let mut keys: HashSet<String> = games.keys().cloned().collect();
+
+    let bag: HashMap<&str, i32> = [("red", 12), ("green", 13), ("blue", 14)]
+        .iter()
+        .cloned()
+        .collect();
+
+    for (game_id, game_elements) in games.iter() {
+        if !is_game_possible(game_elements, &bag) {
+            keys.remove(game_id);
+            println!("Game {} is not possible!", game_id);
+        }
+    }
+
+    keys.iter().map(|x| x.parse::<u32>().unwrap()).sum()
+}
+
+fn part_2(input: &str) -> u32 {
+    let games = prepare_games(input);
+    let products: Vec<i32> = games.values().map(|game_elements| calculate_product(game_elements)).collect();
+    products.iter().map(|&x| x as u32).sum()
+}
+
+
+fn main() {
+    let stdout = stdout();
+
+    let result = part_1(INPUT);
+    // let result = part_2(INPUT);
+    let message = String::from("The solution is: ") + &result.to_string() + &String::from("\n");
     let width = message.chars().count();
     let mut writer = BufWriter::new(stdout.lock());
     say(&message, width, &mut writer).unwrap();

@@ -1,5 +1,5 @@
 [package]
-name = "day_1"
+name = "day_2"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,4 +7,3 @@ edition = "2021"
 
 [dependencies]
 ferris-says = "0.3.1"
-regex = "*"
