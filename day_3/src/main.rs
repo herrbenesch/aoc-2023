@@ -96,14 +96,11 @@ fn part_1(lines: Vec<String>) -> u32 {
     let mut numbers: Vec<String> = Vec::new();
     let mut neighbour_number_ranges: Vec<&Vec<usize>> = Vec::new();
     for (row_idx, row) in matrix.iter().enumerate() {
-        println!("{}", row_idx);
-
         for (col_idx, &ch) in row.iter().enumerate() {
             // is symbol
             if ch.is_numeric() || ch == '.' {
                 continue;
             }
-            println!("{}-{}", ch.is_numeric(), ch);
 
             for neighbour in [
                 [row_idx, col_idx - 1],
@@ -135,9 +132,58 @@ fn part_1(lines: Vec<String>) -> u32 {
 
 }
 
-// fn part_2(lines: &str) -> &str {
-//     return lines;
-// }
+fn part_2(lines: Vec<String>) -> u32 {
+    let matrix: Vec<Vec<char>> = lines
+        .iter()
+        .map(|line| line.trim().chars().collect())
+        .collect();
+
+    let number_ranges = extract_number_ranges(matrix.clone());
+
+    let mut numbers: Vec<String> = Vec::new();
+    for (row_idx, row) in matrix.iter().enumerate() {
+        for (col_idx, &ch) in row.iter().enumerate() {
+            let mut neighbour_number_ranges: Vec<&Vec<usize>> = Vec::new();
+            // is symbol
+            if ch != '*' {
+                continue;
+            }
+
+            for neighbour in [
+                [row_idx, col_idx - 1],
+                [row_idx, col_idx + 1],
+                [row_idx - 1, col_idx],
+                [row_idx + 1, col_idx],
+                [row_idx - 1, col_idx - 1],
+                [row_idx - 1, col_idx + 1],
+                [row_idx + 1, col_idx - 1],
+                [row_idx + 1, col_idx + 1],
+            ] {
+                for number_range in number_ranges.keys() {
+                    if is_point_within_direction(&neighbour, number_range) {
+                        neighbour_number_ranges.push(number_range);
+                    }
+                }
+            }
+
+            // make sure we only count each number range once
+            let unique_neighbour_number_ranges: Vec<&Vec<usize>> = neighbour_number_ranges.into_iter().unique().collect();
+            if unique_neighbour_number_ranges.len() == 2 {
+                let mut product = 1;
+                for neighbour_number_range in unique_neighbour_number_ranges.iter() {
+                    let neighbour_number_range_ref: &Vec<usize> = neighbour_number_range;
+                    product *= number_ranges.get(neighbour_number_range_ref).unwrap();
+                }
+                numbers.push(product.to_string());
+            }
+        }
+    }
+    println!("{:?}", numbers);
+    numbers
+        .iter()
+        .map(|s| s.parse::<u32>().unwrap())
+        .sum()
+}
 
 fn main() {
     let stdout = stdout();
@@ -147,8 +193,8 @@ fn main() {
         .map(|l| l.to_string())
         .collect();
 
-    let result = part_1(lines);
-    // let result = part_2(INPUT);
+    // let result = part_1(lines);
+    let result = part_2(lines);
     let message = String::from("The solution is: ") + &result.to_string() + &String::from("\n");
     let width = message.chars().count();
     let mut writer = BufWriter::new(stdout.lock());
@@ -179,8 +225,22 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_part_2() {
-    //     assert_eq!(part_2("0"), "0");
-    // }
+    #[test]
+    fn test_part_2() {
+        assert_eq!(
+            part_2("467..114..
+                   ...*......
+                   ..35..633.
+                   ......#...
+                   617*......
+                   .....+.58.
+                   ..592.....
+                   ......755.
+                   ...$.*....
+                   .664.598.."
+                   .lines().map(|l| l.to_string()).collect()
+                  ),
+            467835
+        );
+    }
 }
